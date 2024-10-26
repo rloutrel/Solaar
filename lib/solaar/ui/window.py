@@ -276,6 +276,21 @@ def _create_tree(model):
     return tree
 
 
+def _create_menubar() -> Gtk.MenuBar:
+    menubar = Gtk.MenuBar()
+
+    menu_options = Gtk.Menu()
+    menu_options_item = Gtk.MenuItem(label="Options")
+    menu_options_item.set_submenu(menu_options)
+
+    hide_on_startup_item = Gtk.CheckMenuItem(label="Hide on startup")
+    menu_options.append(hide_on_startup_item)
+
+    menubar.append(menu_options_item)
+
+    return menubar
+
+
 def _create_window_layout():
     assert _tree is not None
     assert _details is not None
@@ -284,6 +299,9 @@ def _create_window_layout():
 
     assert _tree.get_selection().get_mode() == Gtk.SelectionMode.SINGLE
     _tree.get_selection().connect("changed", _device_selected)
+
+    # Create and add the menu bar
+    menubar = _create_menubar()
 
     tree_scroll = Gtk.ScrolledWindow()
     tree_scroll.add(_tree)
@@ -314,6 +332,7 @@ def _create_window_layout():
     bottom_buttons_box.set_child_secondary(diversion_button, True)
 
     vbox = Gtk.Box.new(Gtk.Orientation.VERTICAL, 8)
+    vbox.pack_start(menubar, False, False, 0)
     vbox.set_border_width(8)
     vbox.pack_start(panel, True, True, 0)
     vbox.pack_end(bottom_buttons_box, False, False, 0)
