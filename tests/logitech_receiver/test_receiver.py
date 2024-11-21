@@ -8,6 +8,9 @@ from logitech_receiver import base
 from logitech_receiver import common
 from logitech_receiver import exceptions
 from logitech_receiver import receiver
+from logitech_receiver.base import HIDPPNotification
+from logitech_receiver.hidpp10_constants import DeviceKind
+from logitech_receiver.hidpp10_constants import PowerSwitchLocation
 
 from . import fake_hidpp
 
@@ -25,6 +28,12 @@ class LowLevelInterfaceFake:
     def find_paired_node(self, receiver_path: str, index: int, timeout: int):
         return None
 
+    def find_paired_node_wpid(self, receiver_path: str, index: int):
+        if index == 0:
+            return None
+        else:
+            return index + 10
+
     def request(self, response, *args, **kwargs):
         func = partial(fake_hidpp.request, self.responses)
         return func(response, *args, **kwargs)
@@ -41,10 +50,10 @@ class LowLevelInterfaceFake:
     "index, expected_kind",
     [
         (0, None),
-        (1, 2),  # mouse
-        (2, 2),  # mouse
-        (3, 1),  # keyboard
-        (4, 3),  # numpad
+        (1, DeviceKind.MOUSE),
+        (2, DeviceKind.MOUSE),
+        (3, DeviceKind.KEYBOARD),
+        (4, DeviceKind.NUMPAD),
         (5, None),
     ],
 )
@@ -99,6 +108,10 @@ responses_lacking = [
     fake_hidpp.Response("000000", 0x8003, "FF", handle=0x14),
     fake_hidpp.Response("000300", 0x8102, handle=0x14),
 ]
+responses_bolt = [
+    fake_hidpp.Response("666CAFE666CAFE", 0x83FB, handle=0x14),
+]
+responses_ex100 = []
 
 mouse_info = {
     "kind": common.NamedInt(2, "mouse"),
@@ -164,6 +177,8 @@ def test_receiver_factory_props(device_info, responses, firmware, codename, rema
         (DeviceInfo("11"), responses_unifying, "No paired devices.", "<UnifyingReceiver(11,17)>"),
         (DeviceInfo("12", product_id=0xC534), responses_c534, "No paired devices.", "<NanoReceiver(12,18)>"),
         (DeviceInfo("13", product_id=0xCCCC), responses_unusual, "No paired devices.", "<Receiver(13,19)>"),
+        (DeviceInfo("14", product_id=0xC548), responses_bolt, "No paired devices.", "<BoltReceiver(14,20)>"),
+        (DeviceInfo("15", product_id=0xC517), responses_ex100, "No paired devices.", "<EX100Receiver27Mhz(15,21)>"),
     ],
 )
 def test_receiver_factory_string(device_info, responses, status_str, strng):
@@ -189,3 +204,177 @@ def test_receiver_factory_no_device(device_info, responses):
 
     with pytest.raises(exceptions.NoSuchDevice):
         r.device_pairing_information(1)
+
+
+@pytest.mark.parametrize(
+    "notification, expected_online, expected_encrypted, expected_wpid, expected_kind",
+    [
+        (HIDPPNotification(0, 0, 0, 0, b"\x40"), False, False, "", DeviceKind.UNKNOWN),
+        (HIDPPNotification(0, 0, 0, 0, b"\x20"), True, True, "", DeviceKind.UNKNOWN),
+        (HIDPPNotification(0, 0, 0, 0x10, b"\x40"), False, True, "", DeviceKind.UNKNOWN),
+        (HIDPPNotification(0, 0, 0, 0, b"\xBF"), True, True, "", DeviceKind.RECEIVER),
+        (HIDPPNotification(0, 0, 0, 0, b"\xDF"), False, False, "", DeviceKind.RECEIVER),
+        (HIDPPNotification(0, 0, 0, 0, b"\x9E"), True, False, "", DeviceKind.REMOTE_CONTROL),
+        (HIDPPNotification(0, 0, 0, 0, b"\x27\x63"), True, True, "63", DeviceKind.REMOTE),
+        (HIDPPNotification(0, 0, 0, 0, b"\xDA\x63\x12"), False, False, "1263", DeviceKind.TABLET),
+    ],
+)
+def test_unifying_receiver_notification_information(
+    notification, expected_online, expected_encrypted, expected_wpid, expected_kind
+):
+    r = receiver.create_receiver(LowLevelInterfaceFake(responses_lacking), DeviceInfo("14"), lambda x: x)
+    assert str(r).startswith("<UnifyingReceiver")
+
+    online, encrypted, wpid, kind = r.notification_information(0, notification)
+
+    assert online == expected_online
+    assert encrypted == expected_encrypted
+    assert wpid == expected_wpid
+    assert kind == expected_kind
+
+
+@pytest.mark.parametrize(
+    "number, notification, expected_encrypted, expected_wpid, expected_kind",
+    [
+        (1, HIDPPNotification(0, 0, 0, 0x02, b"\x80"), True, "00", DeviceKind.MOUSE),
+        (2, HIDPPNotification(0, 0, 0, 0x02, b"\x7F"), False, "00", DeviceKind.MOUSE),
+        (3, HIDPPNotification(0, 0, 0, 0x02, b"\x7F"), False, "00", DeviceKind.KEYBOARD),
+        (4, HIDPPNotification(0, 0, 0, 0x02, b"\x7F\xCA\xFE"), False, "00FE", DeviceKind.NUMPAD),
+    ],
+)
+def test_ex100_receiver_notification_information(number, notification, expected_encrypted, expected_wpid, expected_kind):
+    r = receiver.create_receiver(LowLevelInterfaceFake(responses_ex100), DeviceInfo("11", product_id=0xC517), lambda x: x)
+    assert str(r).startswith("<EX100Receiver27Mhz")
+
+    online, encrypted, wpid, kind = r.notification_information(number, notification)
+
+    assert online is True
+    assert encrypted == expected_encrypted
+    assert wpid == expected_wpid
+    assert kind == expected_kind
+
+
+@pytest.mark.parametrize(
+    "device_data, is_nano_receiver, polling_rate, expected_polling_rate, use_extended, use_undocumented, expected_kind",
+    [
+        (None, None, None, None, None, None, None),
+        ("F0", False, "99", "153ms", False, False, DeviceKind.UNKNOWN),
+        ("F1", False, "00", "0ms", True, False, DeviceKind.KEYBOARD),
+        ("F4", False, "FF", "255ms", False, True, DeviceKind.PRESENTER),
+        ("FF", True, "AA", "", False, False, DeviceKind.UNKNOWN),
+        ("F0", True, "00", "", True, False, DeviceKind.UNKNOWN),
+        ("F5", True, "FF", "", False, True, DeviceKind.UNKNOWN),
+    ],
+)
+def test_unifying_receiver_device_pairing_information(
+    device_data, is_nano_receiver, polling_rate, expected_polling_rate, use_extended, use_undocumented, expected_kind
+):
+    if is_nano_receiver:
+        device = DeviceInfo("14", product_id=0xC534)
+        expected_receiver_type = "<NanoReceiver"
+        responses_registers = [
+            fake_hidpp.Response(f"0000{polling_rate}FACE0000{device_data}", 0x83B5, b"\x04".hex(), handle=0x14)
+        ]
+        expected_wpid = "FACE"
+
+    else:
+        device = DeviceInfo("14")
+        expected_receiver_type = "<UnifyingReceiver"
+        responses_registers = []
+        responses_registers.extend(responses_lacking)
+        expected_wpid = "CAFE"
+
+        if device_data is not None:
+            responses_registers.append(
+                fake_hidpp.Response(f"0000{polling_rate}CAFE0000{device_data}", 0x83B5, b"\x1f".hex(), handle=0x14)
+            )
+
+    if use_extended:
+        responses_registers.append(fake_hidpp.Response("109876543200000000FC", 0x83B5, b"/".hex(), handle=0x14))
+        expected_power_switch = PowerSwitchLocation.BOTTOM_EDGE
+        expected_serial = "98765432"
+    else:
+        expected_power_switch = "(unknown)"
+        expected_serial = None
+
+    if use_undocumented:
+        responses_registers.append(fake_hidpp.Response("000102030405", 0x83D5, handle=0x14))
+        expected_serial = "01020304"
+
+    r = receiver.create_receiver(LowLevelInterfaceFake(responses_registers), device, lambda x: x)
+    assert str(r).startswith(expected_receiver_type)
+
+    if device_data:
+        response = r.device_pairing_information(0)
+
+        assert response.get("wpid", None) == expected_wpid
+        assert response.get("kind", None) == expected_kind
+        assert response.get("polling", "") == expected_polling_rate
+        assert response.get("serial", "") == expected_serial
+        assert response.get("power_switch", None) == expected_power_switch
+
+    else:
+        with pytest.raises(exceptions.NoSuchDevice):
+            r.device_pairing_information(0)
+
+
+@pytest.mark.parametrize(
+    "device_data, expected_kind",
+    [
+        (None, None),
+        ("F0", DeviceKind.UNKNOWN),
+        ("F1", DeviceKind.KEYBOARD),
+        ("F9", DeviceKind.TOUCHPAD),
+        ("FA", DeviceKind.TABLET),
+        ("FF", DeviceKind.RECEIVER),
+    ],
+)
+def test_bolt_receiver_device_pairing_information(device_data, expected_kind):
+    responses_registers = []
+    responses_registers.extend(responses_bolt)
+    if device_data is not None:
+        responses_registers.append(fake_hidpp.Response(f"00{device_data}FECADABEDEBA", 0x83B5, "50", handle=0x14))
+    r = receiver.create_receiver(LowLevelInterfaceFake(responses_registers), DeviceInfo("14", product_id=0xC548), lambda x: x)
+    assert str(r).startswith("<BoltReceiver")
+
+    if device_data:
+        response = r.device_pairing_information(0)
+
+        assert response.get("wpid", None) == "CAFE"
+        assert response.get("kind", None) == expected_kind
+        assert response.get("polling", "") is None
+        assert response.get("serial", "") == "DABEDEBA"
+        assert response.get("power_switch", None) == "(unknown)"
+
+    else:
+        with pytest.raises(exceptions.NoSuchDevice):
+            r.device_pairing_information(0)
+
+
+@pytest.mark.parametrize(
+    "index, expected_kind",
+    [
+        (0, None),
+        (1, DeviceKind.MOUSE),
+        (2, DeviceKind.MOUSE),
+        (3, DeviceKind.KEYBOARD),
+        (4, DeviceKind.NUMPAD),
+    ],
+)
+def test_ex100_receiver_device_pairing_information(index, expected_kind):
+    r = receiver.create_receiver(LowLevelInterfaceFake(responses_ex100), DeviceInfo("14", product_id=0xC517), lambda x: x)
+    assert str(r).startswith("<EX100Receiver27Mhz")
+
+    if index != 0:
+        response = r.device_pairing_information(index)
+
+        # wpid: (index + 10) logic comes from the low_level mock, not the code (testing the good attribution)
+        assert response.get("wpid", None) == index + 10
+        assert response.get("kind", None) == expected_kind
+        assert response.get("polling", None) == ""
+        assert response.get("serial", "") is None
+        assert response.get("power_switch", None) == "(unknown)"
+
+    else:
+        with pytest.raises(exceptions.NoSuchDevice):
+            r.device_pairing_information(index)

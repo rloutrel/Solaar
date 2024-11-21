@@ -36,13 +36,13 @@ from typing_extensions import Protocol
 
 from . import common
 from . import exceptions
-from . import hidpp10_constants
 from . import special_keys
 from .common import Battery
 from .common import BatteryLevelApproximation
 from .common import BatteryStatus
 from .common import FirmwareKind
 from .common import NamedInt
+from .common import NamedInts
 from .hidpp20_constants import DEVICE_KIND
 from .hidpp20_constants import ChargeLevel
 from .hidpp20_constants import ChargeType
@@ -55,7 +55,23 @@ logger = logging.getLogger(__name__)
 
 FixedBytes5 = bytes
 
-KIND_MAP = {kind: hidpp10_constants.DEVICE_KIND[str(kind)] for kind in DEVICE_KIND}
+HIDPP10_DEVICE_KIND = NamedInts(
+    unknown=0x00,
+    keyboard=0x01,
+    mouse=0x02,
+    numpad=0x03,
+    presenter=0x04,
+    remote=0x07,
+    trackball=0x08,
+    touchpad=0x09,
+    tablet=0x0A,
+    gamepad=0x0B,
+    joystick=0x0C,
+    headset=0x0D,  # not from Logitech documentation
+    remote_control=0x0E,  # for compatibility with HID++ 2.0
+    receiver=0x0F,  # for compatibility with HID++ 2.0
+)
+KIND_MAP = {kind: HIDPP10_DEVICE_KIND[str(kind)] for kind in DEVICE_KIND}
 
 
 class Device(Protocol):

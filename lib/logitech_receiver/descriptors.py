@@ -24,7 +24,7 @@ An entry should only be added to fix problems, such as
 - the name or codename should be different from what the device reports
 """
 
-from .hidpp10_constants import DEVICE_KIND
+from .hidpp10_constants import DeviceKind
 from .hidpp10_constants import Registers as Reg
 
 
@@ -71,15 +71,15 @@ def _D(
 ):
     if kind is None:
         kind = (
-            DEVICE_KIND.mouse
+            DeviceKind.MOUSE
             if "Mouse" in name
-            else DEVICE_KIND.keyboard
+            else DeviceKind.KEYBOARD
             if "Keyboard" in name
-            else DEVICE_KIND.numpad
+            else DeviceKind.NUMPAD
             if "Number Pad" in name
-            else DEVICE_KIND.touchpad
+            else DeviceKind.TOUCHPAD
             if "Touchpad" in name
-            else DEVICE_KIND.trackball
+            else DeviceKind.TRACKBALL
             if "Trackball" in name
             else None
         )
@@ -92,11 +92,11 @@ def _D(
                     assert w[0:1] == "4", f"{name} has protocol {protocol:0.1f}, wpid {w}"
                 else:
                     if w[0:1] == "1":
-                        assert kind == DEVICE_KIND.mouse, f"{name} has protocol {protocol:0.1f}, wpid {w}"
+                        assert kind == DeviceKind.MOUSE, f"{name} has protocol {protocol:0.1f}, wpid {w}"
                     elif w[0:1] == "2":
                         assert kind in (
-                            DEVICE_KIND.keyboard,
-                            DEVICE_KIND.numpad,
+                            DeviceKind.KEYBOARD,
+                            DeviceKind.NUMPAD,
                         ), f"{name} has protocol {protocol:0.1f}, wpid {w}"
 
     device_descriptor = _DeviceDescriptor(
@@ -254,7 +254,7 @@ _D("V450 Laser Cordless Mouse", codename="V450", protocol=1.0, wpid="1005", regi
 _D(
     "VX Revolution",
     codename="VX Revolution",
-    kind=DEVICE_KIND.mouse,
+    kind=DeviceKind.MOUSE,
     protocol=1.0,
     wpid=("1006", "100D", "0612"),
     registers=(Reg.BATTERY_CHARGE,),
@@ -263,7 +263,7 @@ _D(
     "MX Air",
     codename="MX Air",
     protocol=1.0,
-    kind=DEVICE_KIND.mouse,
+    kind=DeviceKind.MOUSE,
     wpid=("1007", "100E"),
     registers=Reg.BATTERY_CHARGE,
 )
@@ -271,7 +271,7 @@ _D(
     "MX Revolution",
     codename="MX Revolution",
     protocol=1.0,
-    kind=DEVICE_KIND.mouse,
+    kind=DeviceKind.MOUSE,
     wpid=("1008", "100C"),
     registers=(Reg.BATTERY_CHARGE,),
 )
@@ -307,7 +307,7 @@ _D(
     "MX 1100 Cordless Laser Mouse",
     codename="MX 1100",
     protocol=1.0,
-    kind=DEVICE_KIND.mouse,
+    kind=DeviceKind.MOUSE,
     wpid="1014",
     registers=(Reg.BATTERY_CHARGE,),
 )
@@ -421,7 +421,7 @@ _D("G502 Lightspeed Gaming Mouse", codename="G502 Lightspeed", usbid=0xC08D)
 _D("MX518 Gaming Mouse", codename="MX518", usbid=0xC08E, interface=1)
 _D("G703 Hero Gaming Mouse", codename="G703 Hero", usbid=0xC090)
 _D("G903 Hero Gaming Mouse", codename="G903 Hero", usbid=0xC091)
-_D(None, kind=DEVICE_KIND.mouse, usbid=0xC092, interface=1)  # two mice share this ID
+_D(None, kind=DeviceKind.MOUSE, usbid=0xC092, interface=1)  # two mice share this ID
 _D("M500S Mouse", codename="M500S", usbid=0xC093, interface=1)
 # _D('G600 Gaming Mouse', codename='G600 Gaming', usbid=0xc24a, interface=1) # not an HID++ device
 _D("G500s Gaming Mouse", codename="G500s Gaming", usbid=0xC24E, interface=1, protocol=1.0)
@@ -438,22 +438,20 @@ _D("Wireless Trackball M570", codename="M570")
 
 _D("Wireless Touchpad", codename="Wireless Touch", protocol=2.0, wpid="4011")
 _D("Wireless Rechargeable Touchpad T650", codename="T650", protocol=2.0, wpid="4101")
-_D(
-    "G Powerplay", codename="Powerplay", protocol=2.0, kind=DEVICE_KIND.touchpad, wpid="405F"
-)  # To override self-identification
+_D("G Powerplay", codename="Powerplay", protocol=2.0, kind=DeviceKind.TOUCHPAD, wpid="405F")  # To override self-identification
 
 # Headset
 
-_D("G533 Gaming Headset", codename="G533 Headset", protocol=2.0, interface=3, kind=DEVICE_KIND.headset, usbid=0x0A66)
-_D("G535 Gaming Headset", codename="G535 Headset", protocol=2.0, interface=3, kind=DEVICE_KIND.headset, usbid=0x0AC4)
-_D("G935 Gaming Headset", codename="G935 Headset", protocol=2.0, interface=3, kind=DEVICE_KIND.headset, usbid=0x0A87)
-_D("G733 Gaming Headset", codename="G733 Headset", protocol=2.0, interface=3, kind=DEVICE_KIND.headset, usbid=0x0AB5)
+_D("G533 Gaming Headset", codename="G533 Headset", protocol=2.0, interface=3, kind=DeviceKind.HEADSET, usbid=0x0A66)
+_D("G535 Gaming Headset", codename="G535 Headset", protocol=2.0, interface=3, kind=DeviceKind.HEADSET, usbid=0x0AC4)
+_D("G935 Gaming Headset", codename="G935 Headset", protocol=2.0, interface=3, kind=DeviceKind.HEADSET, usbid=0x0A87)
+_D("G733 Gaming Headset", codename="G733 Headset", protocol=2.0, interface=3, kind=DeviceKind.HEADSET, usbid=0x0AB5)
 _D(
     "G733 Gaming Headset",
     codename="G733 Headset New",
     protocol=2.0,
     interface=3,
-    kind=DEVICE_KIND.headset,
+    kind=DeviceKind.HEADSET,
     usbid=0x0AFE,
 )
 _D(
@@ -461,6 +459,6 @@ _D(
     codename="PRO Headset",
     protocol=2.0,
     interface=3,
-    kind=DEVICE_KIND.headset,
+    kind=DeviceKind.HEADSET,
     usbid=0x0ABA,
 )

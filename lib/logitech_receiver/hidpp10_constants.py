@@ -20,30 +20,28 @@ from enum import Flag
 from enum import IntEnum
 from typing import List
 
-from .common import NamedInts
-
 """HID constants for HID++ 1.0.
 
 Most of them as defined by the official Logitech HID++ 1.0
 documentation, some of them guessed.
 """
 
-DEVICE_KIND = NamedInts(
-    unknown=0x00,
-    keyboard=0x01,
-    mouse=0x02,
-    numpad=0x03,
-    presenter=0x04,
-    remote=0x07,
-    trackball=0x08,
-    touchpad=0x09,
-    tablet=0x0A,
-    gamepad=0x0B,
-    joystick=0x0C,
-    headset=0x0D,  # not from Logitech documentation
-    remote_control=0x0E,  # for compatibility with HID++ 2.0
-    receiver=0x0F,  # for compatibility with HID++ 2.0
-)
+
+class DeviceKind(IntEnum):
+    UNKNOWN = 0x00
+    KEYBOARD = 0x01
+    MOUSE = 0x02
+    NUMPAD = 0x03
+    PRESENTER = 0x04
+    REMOTE = 0x07
+    TRACKBALL = 0x08
+    TOUCHPAD = 0x09
+    TABLET = 0x0A
+    GAMEPAD = 0x0B
+    JOYSTICK = 0x0C
+    HEADSET = 0x0D  # not from Logitech documentation
+    REMOTE_CONTROL = 0x0E  # for compatibility with HID++ 2.0
+    RECEIVER = 0x0F  # for compatibility with HID++ 2.0
 
 
 class PowerSwitchLocation(IntEnum):

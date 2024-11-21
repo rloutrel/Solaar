@@ -33,6 +33,7 @@ from solaar.i18n import ngettext
 from . import exceptions
 from . import hidpp10
 from . import hidpp10_constants
+from .base import HIDPPNotification
 from .common import Alert
 from .common import Notification
 from .device import Device
@@ -202,12 +203,12 @@ class Receiver:
             if not self.write_register(Registers.RECEIVER_CONNECTION, 0x02):
                 logger.warning("%s: failed to trigger device link notifications", self)
 
-    def notification_information(self, number, notification):
+    def notification_information(self, number, notification: HIDPPNotification):
         """Extract information from unifying-style notification"""
         assert notification.address != 0x02
         online = not bool(notification.data[0] & 0x40)
         encrypted = bool(notification.data[0] & 0x20) or notification.address == 0x10
-        kind = hidpp10_constants.DEVICE_KIND[notification.data[0] & 0x0F]
+        kind = hidpp10_constants.DeviceKind(notification.data[0] & 0x0F)
         wpid = (notification.data[2:3] + notification.data[1:2]).hex().upper()
         return online, encrypted, wpid, kind
 
@@ -219,14 +220,14 @@ class Receiver:
         pair_info = self.read_register(Registers.RECEIVER_INFO, InfoSubRegisters.PAIRING_INFORMATION + n - 1)
         if pair_info:  # a receiver that uses Unifying-style pairing registers
             wpid = pair_info[3:5].hex().upper()
-            kind = hidpp10_constants.DEVICE_KIND[pair_info[7] & 0x0F]
+            kind = hidpp10_constants.DeviceKind(pair_info[7] & 0x0F)
             polling_rate = str(pair_info[2]) + "ms"
         elif not self.receiver_kind == "unifying":  # may be an old Nano receiver
             device_info = self.read_register(Registers.RECEIVER_INFO, 0x04)  # undocumented
             if device_info:
                 logger.warning("using undocumented register for device wpid")
                 wpid = device_info[3:5].hex().upper()
-                kind = hidpp10_constants.DEVICE_KIND[0x00]  # unknown kind
+                kind = hidpp10_constants.DeviceKind.UNKNOWN
             else:
                 raise exceptions.NoSuchDevice(number=n, receiver=self, error="read pairing information - non-unifying")
         else:
@@ -423,7 +424,7 @@ class BoltReceiver(Receiver):
         pair_info = self.read_register(Registers.RECEIVER_INFO, InfoSubRegisters.BOLT_PAIRING_INFORMATION + n)
         if pair_info:
             wpid = (pair_info[3:4] + pair_info[2:3]).hex().upper()
-            kind = hidpp10_constants.DEVICE_KIND[pair_info[1] & 0x0F]
+            kind = hidpp10_constants.DeviceKind(pair_info[1] & 0x0F)
             serial = pair_info[4:8].hex().upper()
             return {"wpid": wpid, "kind": kind, "polling": None, "serial": serial, "power_switch": "(unknown)"}
         else:
@@ -482,7 +483,7 @@ class Ex100Receiver(Receiver):
         assert notification.address == 0x02
         online = True
         encrypted = bool(notification.data[0] & 0x80)
-        kind = hidpp10_constants.DEVICE_KIND[_get_kind_from_index(self, number)]
+        kind = _get_kind_from_index(self, number)
         wpid = "00" + notification.data[2:3].hex().upper()
         return online, encrypted, wpid, kind
 
@@ -492,25 +493,22 @@ class Ex100Receiver(Receiver):
         if not wpid:
             logger.error("Unable to get wpid from udev for device %d of %s", number, self)
             raise exceptions.NoSuchDevice(number=number, receiver=self, error="Not present 27Mhz device")
-        kind = hidpp10_constants.DEVICE_KIND[_get_kind_from_index(self, number)]
+        kind = _get_kind_from_index(self, number)
         return {"wpid": wpid, "kind": kind, "polling": "", "serial": None, "power_switch": "(unknown)"}
 
 
-def _get_kind_from_index(receiver, index):
+def _get_kind_from_index(receiver, index) -> hidpp10_constants.DeviceKind:
     """Get device kind from 27Mhz device index"""
     # From drivers/hid/hid-logitech-dj.c
-    if index == 1:  # mouse
-        kind = 2
-    elif index == 2:  # mouse
-        kind = 2
-    elif index == 3:  # keyboard
-        kind = 1
-    elif index == 4:  # numpad
-        kind = 3
+    if index in [1, 2]:
+        return hidpp10_constants.DeviceKind.MOUSE
+    elif index == 3:
+        return hidpp10_constants.DeviceKind.KEYBOARD
+    elif index == 4:
+        return hidpp10_constants.DeviceKind.NUMPAD
     else:  # unknown device number on 27Mhz receiver
         logger.error("failed to calculate device kind for device %d of %s", index, receiver)
         raise exceptions.NoSuchDevice(number=index, receiver=receiver, error="Unknown 27Mhz device number")
-    return kind
 
 
 receiver_class_mapping = {

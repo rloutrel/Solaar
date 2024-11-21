@@ -83,7 +83,7 @@ def run(receivers, args, find_receiver, _ignore):
         receiver.pair_device(
             address=address,
             authentication=authentication,
-            entropy=20 if kind == hidpp10_constants.DEVICE_KIND.keyboard else 10,
+            entropy=20 if kind == hidpp10_constants.DeviceKind.KEYBOARD else 10,
         )
         pairing_start = time()
         patience = 5  # the discovering notification may come slightly later, so be patient

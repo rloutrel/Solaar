@@ -118,7 +118,7 @@ def _check_lock_state(assistant, receiver, count):
         return True
     elif receiver.pairing.discovering and receiver.pairing.device_address and receiver.pairing.device_name:
         add = receiver.pairing.device_address
-        ent = 20 if receiver.pairing.device_kind == hidpp10_constants.DEVICE_KIND.keyboard else 10
+        ent = 20 if receiver.pairing.device_kind == hidpp10_constants.DeviceKind.KEYBOARD else 10
         if receiver.pair_device(address=add, authentication=receiver.pairing.device_authentication, entropy=ent):
             return True
         else:
